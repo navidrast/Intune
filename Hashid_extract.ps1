@@ -1,251 +1,175 @@
-<#PSScriptInfo
-
-.VERSION 2.3
-
-.GUID ebf446a3-3362-4774-83c0-b7299410b63f
-
-.AUTHOR Michael Niehaus
-
-.COMPANYNAME Microsoft
-
-.COPYRIGHT 
-
-.TAGS Windows AutoPilot
-
-.LICENSEURI 
-
-.PROJECTURI 
-
-.ICONURI 
-
-.EXTERNALMODULEDEPENDENCIES 
-
-.REQUIREDSCRIPTS 
-
-.EXTERNALSCRIPTDEPENDENCIES 
-
-.RELEASENOTES
-Version 1.0:  Original published version.
-Version 1.1:  Added -Append switch.
-Version 1.2:  Added -Credential switch.
-Version 1.3:  Added -Partner switch.
-Version 1.4:  Switched from Get-WMIObject to Get-CimInstance.
-Version 1.5:  Added -GroupTag parameter.
-Version 1.6:  Bumped version number (no other change).
-Version 2.0:  Added -Online parameter.
-Version 2.1:  Bug fix.
-Version 2.3:  Updated comments.
-#>
-
 <#
 .SYNOPSIS
-Retrieves the Windows AutoPilot deployment details from one or more computers
-.DESCRIPTION
-This script uses WMI to retrieve properties needed for a customer to register a device with Windows Autopilot.  Note that it is normal for the resulting CSV file to not collect a Windows Product ID (PKID) value since this is not required to register a device.  Only the serial number and hardware hash will be populated.
-.PARAMETER Name
-The names of the computers.  These can be provided via the pipeline (property name Name or one of the available aliases, DNSHostName, ComputerName, and Computer).
-.PARAMETER OutputFile
-The name of the CSV file to be created with the details for the computers.  If not specified, the details will be returned to the PowerShell
-pipeline.
-.PARAMETER Append
-Switch to specify that new computer details should be appended to the specified output file, instead of overwriting the existing file.
-.PARAMETER Credential
-Credentials that should be used when connecting to a remote computer (not supported when gathering details from the local computer).
-.PARAMETER Partner
-Switch to specify that the created CSV file should use the schema for Partner Center (using serial number, make, and model).
-.PARAMETER GroupTag
-An optional tag value that should be included in a CSV file that is intended to be uploaded via Intune (not supported by Partner Center or Microsoft Store for Business).
-.PARAMETER Online
-Add computers to Windows Autopilot via the Intune Graph API
-.EXAMPLE
-.\Get-WindowsAutoPilotInfo.ps1 -ComputerName MYCOMPUTER -OutputFile .\MyComputer.csv
-.EXAMPLE
-.\Get-WindowsAutoPilotInfo.ps1 -ComputerName MYCOMPUTER -OutputFile .\MyComputer.csv -GroupTag Kiosk
-.EXAMPLE
-.\Get-WindowsAutoPilotInfo.ps1 -ComputerName MYCOMPUTER -OutputFile .\MyComputer.csv -Append
-.EXAMPLE
-.\Get-WindowsAutoPilotInfo.ps1 -ComputerName MYCOMPUTER1,MYCOMPUTER2 -OutputFile .\MyComputers.csv
-.EXAMPLE
-Get-ADComputer -Filter * | .\GetWindowsAutoPilotInfo.ps1 -OutputFile .\MyComputers.csv
-.EXAMPLE
-Get-CMCollectionMember -CollectionName "All Systems" | .\GetWindowsAutoPilotInfo.ps1 -OutputFile .\MyComputers.csv
-.EXAMPLE
-.\Get-WindowsAutoPilotInfo.ps1 -ComputerName MYCOMPUTER1,MYCOMPUTER2 -OutputFile .\MyComputers.csv -Partner
-.EXAMPLE
-.\GetWindowsAutoPilotInfo.ps1 -Online
+Gathers Windows AutoPilot information from specified computers.
 
+.DESCRIPTION
+This script collects Windows AutoPilot deployment details from one or more computers using CIM.
+It can output data to a CSV file or the PowerShell pipeline and optionally add devices to Windows AutoPilot via Intune Graph API.
+
+.PARAMETER ComputerList
+Array of computer names to process. Defaults to the local computer if not specified.
+
+.PARAMETER CSVPath
+Path to the CSV file for storing the collected data. If not provided, data is output to the pipeline.
+
+.PARAMETER AppendCSV
+Switch to append data to an existing CSV file instead of overwriting.
+
+.PARAMETER RemoteCredential
+Credentials for connecting to remote computers.
+
+.PARAMETER PartnerFormat
+Switch to use Partner Center schema (includes manufacturer and model).
+
+.PARAMETER DeviceGroupTag
+Optional group tag for Intune CSV uploads.
+
+.PARAMETER BypassHashCheck
+Switch to collect make and model even if hardware hash is available.
+
+.PARAMETER UseIntuneAPI
+Switch to add computers to Windows AutoPilot using Intune Graph API.
+
+.EXAMPLE
+.\Get-AutoPilotInfo.ps1 -ComputerList "PC01","PC02" -CSVPath ".\AutoPilotDevices.csv"
+
+.NOTES
+Version: 1.0
+Author: Navid Rastegani
 #>
 
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory=$False,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True,Position=0)][alias("DNSHostName","ComputerName","Computer")] [String[]] $Name = @("localhost"),
-	[Parameter(Mandatory=$False)] [String] $OutputFile = "", 
-	[Parameter(Mandatory=$False)] [String] $GroupTag = "",
-	[Parameter(Mandatory=$False)] [Switch] $Append = $false,
-	[Parameter(Mandatory=$False)] [System.Management.Automation.PSCredential] $Credential = $null,
-	[Parameter(Mandatory=$False)] [Switch] $Partner = $false,
-	[Parameter(Mandatory=$False)] [Switch] $Force = $false,
-	[Parameter(Mandatory=$False)] [Switch] $Online = $false
+    [Parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+    [Alias("Computers", "Hosts")]
+    [string[]] $ComputerList = @($env:COMPUTERNAME),
+
+    [string] $CSVPath,
+
+    [switch] $AppendCSV,
+
+    [PSCredential] $RemoteCredential,
+
+    [switch] $PartnerFormat,
+
+    [string] $DeviceGroupTag,
+
+    [switch] $BypassHashCheck,
+
+    [switch] $UseIntuneAPI
 )
 
-Begin
-{
-	# Initialize empty list
-	$computers = @()
+function Get-AutoPilotDeviceInfo {
+    param (
+        [string] $ComputerName,
+        [PSCredential] $Credential
+    )
 
-	# If online, make sure we are able to authenticate
-	if ($Online) {
+    $cimParams = @{
+        ComputerName = $ComputerName
+        ErrorAction = 'Stop'
+    }
+    if ($Credential) { $cimParams['Credential'] = $Credential }
 
-		# Make sure we can connect
-		$module = Import-Module WindowsAutopilotIntune -PassThru -ErrorAction Ignore
-		if (-not $module) {
-			Write-Host "Installing module WindowsAutopilotIntune"
-			Install-Module WindowsAutopilotIntune -Force
-		}
-		Import-Module WindowsAutopilotIntune -Scope Global
-		$graph = Connect-MSGraph
-		Write-Host "Connected to tenant $($graph.TenantId)"
+    try {
+        $cimSession = New-CimSession @cimParams
+        $biosInfo = Get-CimInstance -CimSession $cimSession -ClassName Win32_BIOS
+        $serialNumber = $biosInfo.SerialNumber
 
-		# Force the output to a file
-		if ($OutputFile -eq "")
-		{
-			$OutputFile = "$($env:TEMP)\autopilot.csv"
-		} 
-	}
+        $hashInfo = Get-CimInstance -CimSession $cimSession -Namespace root/cimv2/mdm/dmmap -ClassName MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'" -ErrorAction SilentlyContinue
+        $hardwareHash = if ($hashInfo -and -not $BypassHashCheck) { $hashInfo.DeviceHardwareData } else { $null }
+
+        if (-not $hardwareHash -or $BypassHashCheck) {
+            $csInfo = Get-CimInstance -CimSession $cimSession -ClassName Win32_ComputerSystem
+            $manufacturer = $csInfo.Manufacturer.Trim()
+            $model = $csInfo.Model.Trim()
+        }
+
+        $deviceInfo = [PSCustomObject]@{
+            SerialNumber = $serialNumber
+            HardwareHash = $hardwareHash
+            Manufacturer = $manufacturer
+            Model = $model
+        }
+
+        Remove-CimSession -CimSession $cimSession
+        return $deviceInfo
+    }
+    catch {
+        Write-Error "Failed to retrieve information from $ComputerName : $_"
+        return $null
+    }
 }
 
-Process
-{
-	foreach ($comp in $Name)
-	{
-		$bad = $false
+function Format-AutoPilotCSV {
+    param (
+        [Array] $DeviceList,
+        [bool] $IsPartnerFormat,
+        [string] $GroupTag
+    )
 
-		# Get a CIM session
-		if ($comp -eq "localhost") {
-			$session = New-CimSession
-		}
-		else
-		{
-			$session = New-CimSession -ComputerName $comp -Credential $Credential
-		}
+    $formattedList = foreach ($device in $DeviceList) {
+        $deviceProperties = [ordered]@{
+            "Device Serial Number" = $device.SerialNumber
+            "Windows Product ID"   = ""
+            "Hardware Hash"        = $device.HardwareHash
+        }
 
-		# Get the common properties.
-		Write-Verbose "Checking $comp"
-		$serial = (Get-CimInstance -CimSession $session -Class Win32_BIOS).SerialNumber
+        if ($IsPartnerFormat) {
+            $deviceProperties["Manufacturer name"] = $device.Manufacturer
+            $deviceProperties["Device model"] = $device.Model
+        }
+        elseif ($GroupTag) {
+            $deviceProperties["Group Tag"] = $GroupTag
+        }
 
-		# Get the hash (if available)
-		$devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
-		if ($devDetail -and (-not $Force))
-		{
-			$hash = $devDetail.DeviceHardwareData
-		}
-		else
-		{
-			$bad = $true
-			$hash = ""
-		}
+        [PSCustomObject]$deviceProperties
+    }
 
-		# If the hash isn't available, get the make and model
-		if ($bad -or $Force)
-		{
-			$cs = Get-CimInstance -CimSession $session -Class Win32_ComputerSystem
-			$make = $cs.Manufacturer.Trim()
-			$model = $cs.Model.Trim()
-			if ($Partner)
-			{
-				$bad = $false
-			}
-		}
-		else
-		{
-			$make = ""
-			$model = ""
-		}
-
-		# Getting the PKID is generally problematic for anyone other than OEMs, so let's skip it here
-		$product = ""
-
-		# Depending on the format requested, create the necessary object
-		if ($Partner)
-		{
-			# Create a pipeline object
-			$c = New-Object psobject -Property @{
-				"Device Serial Number" = $serial
-				"Windows Product ID" = $product
-				"Hardware Hash" = $hash
-				"Manufacturer name" = $make
-				"Device model" = $model
-			}
-			# From spec:
-			#	"Manufacturer Name" = $make
-			#	"Device Name" = $model
-
-		}
-		elseif ($GroupTag -ne "")
-		{
-			# Create a pipeline object
-			$c = New-Object psobject -Property @{
-				"Device Serial Number" = $serial
-				"Windows Product ID" = $product
-				"Hardware Hash" = $hash
-				"Group Tag" = $GroupTag
-			}
-		}
-		else
-		{
-			# Create a pipeline object
-			$c = New-Object psobject -Property @{
-				"Device Serial Number" = $serial
-				"Windows Product ID" = $product
-				"Hardware Hash" = $hash
-			}
-		}
-
-		# Write the object to the pipeline or array
-		if ($bad)
-		{
-			# Report an error when the hash isn't available
-			Write-Error -Message "Unable to retrieve device hardware data (hash) from computer $comp" -Category DeviceError
-		}
-		elseif ($OutputFile -eq "")
-		{
-			$c
-		}
-		else
-		{
-			$computers += $c
-		}
-
-		Remove-CimSession $session
-	}
+    return $formattedList
 }
 
-End
-{
-	if ($OutputFile -ne "")
-	{
-		if ($Append)
-		{
-			if (Test-Path $OutputFile)
-			{
-				$computers += Import-CSV -Path $OutputFile
-			}
-		}
-		if ($Partner)
-		{
-			$computers | Select "Device Serial Number", "Windows Product ID", "Hardware Hash", "Manufacturer name", "Device model" | ConvertTo-CSV -NoTypeInformation | % {$_ -replace '"',''} | Out-File $OutputFile
-		}
-		elseif ($GroupTag -ne "")
-		{
-			$computers | Select "Device Serial Number", "Windows Product ID", "Hardware Hash", "Group Tag" | ConvertTo-CSV -NoTypeInformation | % {$_ -replace '"',''} | Out-File $OutputFile
-		}
-		else
-		{
-			$computers | Select "Device Serial Number", "Windows Product ID", "Hardware Hash" | ConvertTo-CSV -NoTypeInformation | % {$_ -replace '"',''} | Out-File $OutputFile
-		}
-	}
-	if ($Online)
-	{
-		Import-AutopilotCSV -csvFile $OutputFile
-	}
+# Main script logic
+$collectedDevices = @()
+
+foreach ($computer in $ComputerList) {
+    Write-Verbose "Processing $computer"
+    $deviceInfo = Get-AutoPilotDeviceInfo -ComputerName $computer -Credential $RemoteCredential
+    if ($deviceInfo) { $collectedDevices += $deviceInfo }
+}
+
+if ($UseIntuneAPI) {
+    if (-not (Get-Module -Name WindowsAutopilotIntune -ListAvailable)) {
+        Write-Host "Installing WindowsAutopilotIntune module..."
+        Install-Module WindowsAutopilotIntune -Force -Scope CurrentUser
+    }
+    Import-Module WindowsAutopilotIntune
+    Connect-MSGraph | Out-Null
+    Write-Host "Connected to Intune Graph API"
+
+    if (-not $CSVPath) {
+        $CSVPath = Join-Path $env:TEMP "AutoPilotDevices_$(Get-Date -Format 'yyyyMMddHHmmss').csv"
+    }
+}
+
+$formattedDevices = Format-AutoPilotCSV -DeviceList $collectedDevices -IsPartnerFormat $PartnerFormat -GroupTag $DeviceGroupTag
+
+if ($CSVPath) {
+    $csvParams = @{
+        Path = $CSVPath
+        NoTypeInformation = $true
+    }
+    if ($AppendCSV -and (Test-Path $CSVPath)) {
+        $csvParams['Append'] = $true
+    }
+    $formattedDevices | Export-Csv @csvParams
+    Write-Host "Device information exported to $CSVPath"
+
+    if ($UseIntuneAPI) {
+        Write-Host "Importing devices to Intune..."
+        Import-AutoPilotCSV -CsvFile $CSVPath
+    }
+}
+else {
+    $formattedDevices
 }
