@@ -1,43 +1,76 @@
 # AutoPilot Info Collection Tools
 
-Hello there! This README will guide you through using our handy AutoPilot info collection tools. We've got two scripts that work together to make your life easier when gathering device information for Windows AutoPilot.
+Welcome! This guide will walk you through using our AutoPilot info collection tools. We have two methods: a GUI-based approach and a command-line approach that can be used during AutoPilot deployment.
 
-## What's in the Box?
+## What's Included
 
-1. **CollectAutoPilotInfo.ps1**: A PowerShell script that does the heavy lifting of collecting AutoPilot information from computers.
-2. **RunAutoPilotCollection.bat**: A simple batch file that helps you run the PowerShell script from a USB drive.
+1. **CollectAutoPilotInfo.ps1**: A PowerShell script that collects AutoPilot information from computers.
+2. **RunAutoPilotCollection.cmd**: A command file to easily run the PowerShell script.
 
-## How to Use These Scripts
+## Method 1: GUI-Based Approach
 
-### Step 1: Set Up Your USB Drive
+### Step 1: Prepare Your USB Drive
 
-1. Grab a USB drive.
-2. Copy both `CollectAutoPilotInfo.ps1` and `RunAutoPilotCollection.bat` onto the drive.
+1. Insert a USB drive into your computer.
+2. Copy both `CollectAutoPilotInfo.ps1` and `RunAutoPilotCollection.cmd` onto the drive.
 
 ### Step 2: Collect AutoPilot Info
 
-1. Plug your USB drive into the computer you want to collect info from.
-2. Double-click on `RunAutoPilotCollection.bat`.
-3. When asked, type in the letter of your USB drive (e.g., "E") and press Enter.
-4. Sit back and relax while the script does its job!
+1. Plug the USB drive into the target computer.
+2. Double-click `RunAutoPilotCollection.cmd`.
+3. When prompted, enter the letter of your USB drive (e.g., "E") and press Enter.
+4. Wait for the script to complete its task.
 
-### Step 3: Find Your Results
+### Step 3: Retrieve Results
 
-Once the script finishes, you'll find a new file on your USB drive named something like `AutoPilotHash_COMPUTERNAME.csv`. This file contains all the juicy AutoPilot details for the computer.
+After the script finishes, you'll find a new file on your USB drive named `AutoPilotHash_COMPUTERNAME.csv`.
 
-## What These Scripts Do
+## Method 2: Command Prompt Approach (During AutoPilot Deployment)
 
-- **CollectAutoPilotInfo.ps1**: This clever script gathers all the necessary bits and bobs that AutoPilot needs, like the device's serial number and hardware details.
-- **RunAutoPilotCollection.bat**: This friendly batch file makes running the PowerShell script a breeze, even for those who aren't tech wizards.
+### Step 1: Access Command Prompt
 
-## A Few Helpful Tips
+1. During the AutoPilot deployment process, press Shift+F10 to open a command prompt.
 
-- Make sure you're logged in as an administrator on the computer you're collecting info from.
-- If you run into any hiccups, try running the batch file as an administrator by right-clicking and selecting "Run as administrator".
-- Keep your USB drive safe and sound – it'll have important device information on it!
+### Step 2: Locate Your USB Drive
 
-## Need a Hand?
+1. Insert your USB drive containing the scripts.
+2. In the command prompt, type `wmic logicaldisk get deviceid, volumename` and press Enter.
+3. Note the drive letter assigned to your USB drive.
 
-If you get stuck or have any questions, don't hesitate to reach out to your IT support team. They'll be more than happy to help you out!
+### Step 3: Run the Script
+
+1. Change to your USB drive by typing the drive letter followed by a colon. For example:
+   ```
+   E:
+   ```
+2. Run the command file by typing:
+   ```
+   RunAutoPilotCollection.cmd
+   ```
+3. When prompted, enter the USB drive letter and press Enter.
+4. Wait for the script to complete its task.
+
+### Step 4: Verify Results
+
+Once the script finishes, check your USB drive for a file named `AutoPilotHash_COMPUTERNAME.csv`.
+
+## What the Scripts Do
+
+- **CollectAutoPilotInfo.ps1**: Gathers essential AutoPilot details like the device's serial number and hardware information.
+- **RunAutoPilotCollection.cmd**: Simplifies running the PowerShell script, making it accessible for all skill levels.
+
+## Helpful Tips
+
+- Ensure you have administrator privileges on the target computer.
+- For the GUI method, if you encounter issues, try right-clicking the .cmd file and select "Run as administrator".
+- When using the command prompt method, if you can't run the .cmd file directly, you can execute the PowerShell script with this command:
+  ```
+  powershell -ExecutionPolicy Bypass -File CollectAutoPilotInfo.ps1 -OutputFile AutoPilotHash.csv
+  ```
+- Keep your USB drive secure, as it will contain important device information.
+
+## Need Help?
+
+If you run into any problems or have questions, please reach out to your IT support team. They're here to help!
 
 Happy AutoPilot info collecting!
