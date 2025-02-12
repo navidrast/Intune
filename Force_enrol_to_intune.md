@@ -1,8 +1,3 @@
-Okay, I will incorporate the `Reset-IntuneEnrollment` PowerShell function into the comprehensive Google Doc instructions.  It appears this function is intended for more advanced troubleshooting and manual re-enrollment scenarios rather than the primary automated mass enrollment process. I will add this function to the document, explain its purpose, and clarify that the GPO startup script will still focus on the initial automated enrollment trigger.
-
-Here's the updated comprehensive instruction document in Google Doc format, now including the `Reset-IntuneEnrollment` function:
-
-```
 # Mass Enrolling Hybrid Azure AD Joined Devices into Intune (After SCCM Agent Uninstallation) - Comprehensive Guide
 
 ## Introduction
