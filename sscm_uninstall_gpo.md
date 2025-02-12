@@ -165,12 +165,3 @@ After you have confirmed that the SCCM agent has been uninstalled from all desir
     *   Select **"Delete"**.
     *   Click **"OK"** to confirm the deletion. The GPO object is now permanently removed.
 
----
-
-**To create a Google Doc with these instructions:**
-
-1.  **Open Google Docs:** Go to [https://docs.google.com/](https://docs.google.com/) in your web browser and sign in to your Google account if you are not already logged in.
-2.  **Start a new document:** Click on **"Blank document"** (or the "+" icon to start a new document).
-3.  **Copy and Paste:** Select all the text above, starting from `# Uninstalling SCCM Agents...` down to the end, and copy it (Ctrl+C or Cmd+C). Then, paste it into your new Google Doc (Ctrl+V or Cmd+V).
-4.  **Format (Optional):** Once pasted, you can format the document in Google Docs as you like. You can adjust headings, bullet points, code blocks, and text styles to improve readability.
-5.  **Name your document:** Click on "Untitled document" at the top left and give your document a name, for example, "SCCM Agent Uninstall Instructions via GPO".
