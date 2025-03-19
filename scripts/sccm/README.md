@@ -48,12 +48,50 @@ Ensure the following endpoints are accessible over HTTPS (port 443):
   - **Execute SCCM uninstallation**.
   - **Schedule a reboot** to finalize changes.
 
+```batch
+@echo off
+echo Starting SCCM uninstallation check...
+
+REM Check if SCCM is present
+if not exist "%windir%\ccmsetup\ccmsetup.exe" (
+    echo SCCM not present, marking as uninstalled
+    reg add "HKLM\SOFTWARE\Migration" /v "SCCMUninstalled" /t REG_DWORD /d 1 /f
+    exit /b 0
+)
+
+REM SCCM exists, proceed with uninstallation
+echo SCCM found, starting uninstallation...
+"%windir%\ccmsetup\ccmsetup.exe" /uninstall
+timeout /t 300 /nobreak
+shutdown /r /t 300 /c "System will restart in 5 minutes to complete updates." /f
+```
+
 #### 3️⃣ SCCM Uninstallation Verification
-- Deploy a verification script that ensures SCCM is fully removed, checking:
-  - CCMSetup.exe
-  - CCM folder
-  - CCMExec service
-  - SCCM registry entries
+- Deploy a verification script that ensures SCCM is fully removed.
+
+```batch
+@echo off
+echo Starting SCCM verification...
+reg query "HKLM\SOFTWARE\Migration" /v "SCCMVerified" >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo SCCM verification already completed. Exiting.
+    exit /b 0
+)
+
+REM Verify SCCM removal
+set SCCM_PRESENT=0
+if exist "%windir%\ccmsetup\ccmsetup.exe" set SCCM_PRESENT=1
+if exist "%windir%\CCM" set SCCM_PRESENT=1
+sc query "ccmexec" >nul 2>&1 && set SCCM_PRESENT=1
+
+if %SCCM_PRESENT% EQU 0 (
+    echo SCCM removal verified successfully
+    reg add "HKLM\SOFTWARE\Migration" /v "SCCMVerified" /t REG_DWORD /d 1 /f
+) else (
+    echo SCCM components still present
+    exit /b 1
+)
+```
 
 #### 4️⃣ Intune Enrollment Phase
 - Deploy a **GPO-based enrollment** script to:
@@ -61,13 +99,19 @@ Ensure the following endpoints are accessible over HTTPS (port 443):
   - Configure **registry settings**.
   - Mark the device as **Intune enrolled**.
 
-### 🔹 Deployment Process
+```batch
+@echo off
+echo Starting Intune enrollment check...
+reg query "HKLM\SOFTWARE\Migration" /v "SCCMVerified" >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo SCCM removal not verified. Skipping enrollment.
+    exit /b 1
+)
 
-The migration follows a **phased deployment approach**:
-
-- **Wave 1: Pilot Phase** – Deploy to 10 test devices.
-- **Wave 2: Initial Rollout** – Deploy to 20% of devices.
-- **Wave 3: Full Deployment** – Deploy in **batches**.
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM" /v "AutoEnrollMDM" /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM" /v "UseAADCredentialType" /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Migration" /v "IntuneEnrolled" /t REG_DWORD /d 1 /f
+```
 
 ### 🔹 Verification Steps
 
@@ -87,61 +131,6 @@ Run the following commands to confirm Intune enrollment:
 dsregcmd /status | findstr "AzureAdJoined"
 certutil -store MY | findstr "Microsoft Intune MDM Device CA"
 ```
-
----
-
-## 🛠 SCCM Management & Validation Scripts
-
-These scripts are used to verify SCCM removal, manage bulk verification, and validate Intune enrollment.
-
-### 🔹 SCCM Verification Tool (GUI & Bulk Support)
-
-#### 1️⃣ Single Computer Verification
-- Run `SCCM_Agent_uninstall_verification_bulkversion.ps1`
-- Select **option 1**.
-- Enter the **computer name**.
-- View the **generated HTML report**.
-
-#### 2️⃣ Bulk Verification
-- Prepare a **CSV file** with a `ComputerName` column.
-- Run the PowerShell script.
-- Select **option 2** and choose the CSV file.
-- View the **generated bulk HTML report**.
-
-#### 3️⃣ SCCM Removal Script
-- **File:** `UninstallSCCM.bat`
-- **Purpose:** Batch script to remove SCCM agent from devices.
-
-#### 4️⃣ SCCM Verification Script
-- **File:** `VerifySCCM.bat`
-- **Purpose:** Ensures SCCM has been completely removed.
-
-#### 5️⃣ Intune Enrollment Script
-- **File:** `IntuneEnrollment.bat`
-- **Purpose:** Handles device enrollment into **Microsoft Intune**.
-
-### 🔹 Verification Results Include:
-✔ Computer online status  
-✔ SCCM installation status  
-✔ Required actions  
-✔ Detailed system information  
-✔ Service status  
-
-### 🔹 Requirements
-- **Windows PowerShell 5.1** or later.
-- **Administrative privileges**.
-- **Network connectivity** to target machines.
-- **Required PowerShell modules**:
-  - `System.Windows.Forms`
-  - `System.Drawing`
-
-### 🔹 Report Generation
-The tool generates **HTML reports** containing:
-- **Computer Name**
-- **Status**
-- **Required Actions**
-- **Detailed Information**
-- **Timestamp of verification**
 
 ---
 
