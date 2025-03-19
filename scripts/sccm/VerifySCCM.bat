@@ -2,14 +2,14 @@
 echo Starting SCCM verification...
 
 REM Check if verification already completed
-reg query "HKLM\SOFTWARE\FleetPartners\Migration" /v "SCCMVerified" >nul 2>&1
+reg query "HKLM\SOFTWARE\YourDomainName\Migration" /v "SCCMVerified" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo SCCM verification already completed. Exiting.
     exit /b 0
 )
 
 REM Check for uninstallation marker
-reg query "HKLM\SOFTWARE\FleetPartners\Migration" /v "SCCMUninstalled" >nul 2>&1
+reg query "HKLM\SOFTWARE\YourDomainName\Migration" /v "SCCMUninstalled" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo SCCM uninstallation not yet attempted. Exiting.
     exit /b 1
@@ -57,7 +57,7 @@ if %ERRORLEVEL% EQU 0 (
 
 if %SCCM_PRESENT% EQU 0 (
     echo SCCM removal verified successfully
-    reg add "HKLM\SOFTWARE\FleetPartners\Migration" /v "SCCMVerified" /t REG_DWORD /d 1 /f
+    reg add "HKLM\SOFTWARE\YourDomainName\Migration" /v "SCCMVerified" /t REG_DWORD /d 1 /f
 ) else (
     echo SCCM components still present
     exit /b 1
