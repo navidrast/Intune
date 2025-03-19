@@ -2,15 +2,15 @@
 
 ## Overview
 
-This repository provides an **implementation guide** for migrating from **System Center Configuration Manager (SCCM)** to **Microsoft Intune**, alongside a set of **SCCM management tools** to assist with uninstallation, verification, and enrollment processes.
+This repository provides a structured guide for migrating from **System Center Configuration Manager (SCCM)** to **Microsoft Intune**. It includes step-by-step instructions, deployment strategies, and validation scripts to ensure successful migration. Additionally, this repository contains tools to verify SCCM removal and manage post-migration validation.
 
 ## 📌 Features
 
-- **Bulk SCCM to Intune Migration**
-- **SCCM Agent Uninstallation & Verification Tools**
-- **Automated Enrollment into Intune**
-- **Detailed HTML Reporting for SCCM Status**
-- **Batch & PowerShell Scripts for Automation**
+- **Comprehensive SCCM to Intune Migration Guide**
+- **Automated SCCM Agent Removal**
+- **Validation Scripts for SCCM Removal & Intune Enrollment**
+- **Bulk Device Management Support**
+- **Real-time Status Reporting via PowerShell**
 
 ---
 
@@ -21,9 +21,9 @@ This repository provides an **implementation guide** for migrating from **System
 Before starting the migration, ensure the following requirements are met:
 
 - **Azure AD Connect** is configured and syncing devices.
-- Devices are **Hybrid Azure AD Joined**.
+- Devices must be **Hybrid Azure AD Joined**.
 - **Network connectivity** to Intune endpoints is verified.
-- **Intune licenses** are assigned to all relevant users.
+- **Required Intune licenses** are assigned to users.
 
 ### 🔹 Network Connectivity Verification
 
@@ -37,8 +37,8 @@ Ensure the following endpoints are accessible over HTTPS (port 443):
 ### 🔹 Implementation Steps
 
 #### 1️⃣ Security Group Setup
-- Create an **MDM-Devices** security group.
-- This group controls **Group Policy Object (GPO)** deployment.
+- Create a security group named **MDM-Devices**.
+- This group controls **Group Policy Object (GPO)** application and deployment during migration.
 
 #### 2️⃣ SCCM Removal Phase
 - Deploy a **Startup Script via GPO** to uninstall SCCM.
@@ -49,11 +49,11 @@ Ensure the following endpoints are accessible over HTTPS (port 443):
   - **Schedule a reboot** to finalize changes.
 
 #### 3️⃣ SCCM Uninstallation Verification
-- Checks if SCCM has been fully removed, including:
+- Deploy a verification script that ensures SCCM is fully removed, checking:
   - CCMSetup.exe
   - CCM folder
   - CCMExec service
-  - Registry entries
+  - SCCM registry entries
 
 #### 4️⃣ Intune Enrollment Phase
 - Deploy a **GPO-based enrollment** script to:
@@ -63,7 +63,7 @@ Ensure the following endpoints are accessible over HTTPS (port 443):
 
 ### 🔹 Deployment Process
 
-The migration is **rolled out in phases**:
+The migration follows a **phased deployment approach**:
 
 - **Wave 1: Pilot Phase** – Deploy to 10 test devices.
 - **Wave 2: Initial Rollout** – Deploy to 20% of devices.
@@ -90,51 +90,37 @@ certutil -store MY | findstr "Microsoft Intune MDM Device CA"
 
 ---
 
-## 🛠 SCCM Management Tools
+## 🛠 SCCM Management & Validation Scripts
 
-This directory contains a collection of **tools and scripts** for managing SCCM agents, particularly focused on **uninstallation verification and management**.
+These scripts are used to verify SCCM removal, manage bulk verification, and validate Intune enrollment.
 
-### 🔹 Tools Overview
+### 🔹 SCCM Verification Tool (GUI & Bulk Support)
 
-#### 1️⃣ SCCM Agent Uninstallation Verification Tool
-- **File:** `SCCM_Agent_uninstall_verification_bulkversion.ps1`
-- **Purpose:** Verifies SCCM uninstallation status across multiple computers.
-- **Features:**
-  - GUI-based interface
-  - Single or bulk verification
-  - CSV input support
-  - Detailed HTML report generation
-  - Real-time status checking
-  - System and service analysis
+#### 1️⃣ Single Computer Verification
+- Run `SCCM_Agent_uninstall_verification_bulkversion.ps1`
+- Select **option 1**.
+- Enter the **computer name**.
+- View the **generated HTML report**.
 
-#### 2️⃣ SCCM Uninstallation Script
+#### 2️⃣ Bulk Verification
+- Prepare a **CSV file** with a `ComputerName` column.
+- Run the PowerShell script.
+- Select **option 2** and choose the CSV file.
+- View the **generated bulk HTML report**.
+
+#### 3️⃣ SCCM Removal Script
 - **File:** `UninstallSCCM.bat`
 - **Purpose:** Batch script to remove SCCM agent from devices.
 
-#### 3️⃣ SCCM Verification Script
+#### 4️⃣ SCCM Verification Script
 - **File:** `VerifySCCM.bat`
 - **Purpose:** Ensures SCCM has been completely removed.
 
-#### 4️⃣ Intune Enrollment Script
+#### 5️⃣ Intune Enrollment Script
 - **File:** `IntuneEnrollment.bat`
 - **Purpose:** Handles device enrollment into **Microsoft Intune**.
 
-### 🔹 Usage Instructions
-
-#### ✅ SCCM Verification Tool (GUI)
-**Single Computer Check:**
-1. Run `SCCM_Agent_uninstall_verification_bulkversion.ps1`.
-2. Select **option 1**.
-3. Enter the **computer name**.
-4. View the **generated HTML report**.
-
-**Bulk Verification:**
-1. Prepare a **CSV file** with a `ComputerName` column.
-2. Run the PowerShell script.
-3. Select **option 2** and choose the CSV file.
-4. View the **generated bulk HTML report**.
-
-**Verification Results Include:**
+### 🔹 Verification Results Include:
 ✔ Computer online status  
 ✔ SCCM installation status  
 ✔ Required actions  
