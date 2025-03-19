@@ -1,4 +1,4 @@
-# Improved SCCM Uninstallation Verification Script
+V# Improved SCCM Uninstallation Verification Script
 # This script checks for SCCM components and provides more accurate status information
 # Author: Navid Rastegani, Triforce
 # Email: navid.rastegani@triforce.com.au
@@ -26,7 +26,7 @@ function Get-ComputerName {
     $textBox = New-Object System.Windows.Forms.TextBox
     $textBox.Location = New-Object System.Drawing.Point(10,50)
     $textBox.Size = New-Object System.Drawing.Size(360,20)
-    $textBox.Text = "FP-PF41JL7D"  # Default value from your example
+    $textBox.Text = "HOSTNAME"  # Default value from your example
     $form.Controls.Add($textBox)
 
     $okButton = New-Object System.Windows.Forms.Button
